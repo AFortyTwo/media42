@@ -2,7 +2,6 @@ library(tidyverse)
 library(rvest)
 library(RSelenium)
 library(tidytext)
-libray
 
 #start RSelenium
 rd <- rsDriver(browser = "firefox")
