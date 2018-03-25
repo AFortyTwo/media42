@@ -79,8 +79,8 @@ ratios <- words %>%
   ggplot(aes(word, logratio, fill = logratio < 0)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  ylab("Lauda/Türken ratio") +
-  scale_fill_manual(name = "", labels = c("Lauda", "Türken"),
+  ylab("Lauda/Kurden ratio") +
+  scale_fill_manual(name = "", labels = c("Lauda", "Kurden"),
                     values = c("red", "lightblue"))
 
 articles <- words %>%
@@ -120,7 +120,7 @@ sentiment_differences %>%
   geom_point() +
   geom_errorbarh(aes(xmin = conf.low, xmax = conf.high)) +
   scale_x_continuous(labels = percent_format()) +
-  labs(x = "% increase in Lauda relative to Türken",
+  labs(x = "% increase in Lauda relative to Kurden",
        y = "Sentiment")
 
 
@@ -136,8 +136,8 @@ ratios %>%
   facet_wrap(~ sentiment, scales = "free", nrow = 2) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(x = "", y = "Lauda / Türken log ratio") +
-  scale_fill_manual(name = "", labels = c("Lauda", "Türken"),
+  labs(x = "", y = "Lauda / Kurden log ratio") +
+  scale_fill_manual(name = "", labels = c("Lauda", "Kurden"),
                     values = c("red", "lightblue"))
 
 # Clean up ----------------------------------------------------------------
