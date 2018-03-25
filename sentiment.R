@@ -12,12 +12,14 @@ remDr$open(silent = TRUE)
 # Load comments -----------------------------------------------------------
 krone <- "http://www.krone.at/"
 
+# Load first article
 article <- "1676695"
 url <- paste0(krone, article)
 remDr$navigate(url)
 df1 <- extract_comments()
 df1 %>% View()
 
+# Load second article
 article <- "1675973"
 url <- paste0(krone, article)
 remDr$navigate(url)
@@ -27,6 +29,8 @@ df2 %>% View()
 df <- rbind(df1, df2)
 
 # Sentiment analysis ------------------------------------------------------
+
+# Lexika und Stopwords vorbereiten
 lexicon <-
   rbind(
     read_delim("data/SentiWS_v1.8c_Negative.txt", delim = "\t", col_names = c("word", "s", "synonym")),
@@ -43,16 +47,17 @@ lexicon <- lexicon %>%
     )
   )
 
-lexicon %>% mutate(word = str_extract(word, ".*\\|"))
-reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
 stopwords <- tokenizers::stopwords("de") %>% append(
   c("dass", "ja", "mehr", "mal")
 )
+
+# Wörter extrahieren
 words <- df %>%
   unnest_tokens(word, text, token = "words") %>%  #  "regex", pattern = reg) %>%
   filter(!word %in% stopwords,
          str_detect(word, "[a-z]"))
 
+# Häufigsten Wörter
 words %>%
   count(word, sort = TRUE) %>%
   head(20) %>%
@@ -62,6 +67,7 @@ words %>%
   ylab("Occurrences") +
   coord_flip()
 
+# Relative häufigkeit
 ratios <- words %>%
   count(word, id_article) %>%
   filter(sum(n) >= 5) %>%
@@ -83,6 +89,7 @@ ratios <- words %>%
   scale_fill_manual(name = "", labels = c("Lauda", "Kurden"),
                     values = c("red", "lightblue"))
 
+# Verbindung mit sentiment score
 articles <- words %>%
   group_by(id_article) %>%
   mutate(total_words = n()) %>%
@@ -102,6 +109,24 @@ by_article_sentiment <- words %>%
 
 head(by_source_sentiment)
 
+# Sentiment plot
+ratios %>%
+  inner_join(lexicon, by = "word") %>%
+  # filter(!sentiment %in% c("positive", "negative")) %>%
+  mutate(sentiment = reorder(sentiment, -logratio),
+         word = reorder(word, -logratio)) %>%
+  group_by(sentiment) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  facet_wrap(~ sentiment, scales = "free", nrow = 2) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "", y = "Lauda / Kurden log ratio") +
+  scale_fill_manual(name = "", labels = c("Lauda", "Kurden"),
+                    values = c("red", "lightblue"))
+
+# Ein bisschen Statistik, aber nicht sehr ergibig
 library(broom)
 
 sentiment_differences <- by_article_sentiment %>%
@@ -124,21 +149,8 @@ sentiment_differences %>%
        y = "Sentiment")
 
 
-ratios %>%
-  inner_join(lexicon, by = "word") %>%
-  # filter(!sentiment %in% c("positive", "negative")) %>%
-  mutate(sentiment = reorder(sentiment, -logratio),
-         word = reorder(word, -logratio)) %>%
-  group_by(sentiment) %>%
-  top_n(10, abs(logratio)) %>%
-  ungroup() %>%
-  ggplot(aes(word, logratio, fill = logratio < 0)) +
-  facet_wrap(~ sentiment, scales = "free", nrow = 2) +
-  geom_bar(stat = "identity") +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  labs(x = "", y = "Lauda / Kurden log ratio") +
-  scale_fill_manual(name = "", labels = c("Lauda", "Kurden"),
-                    values = c("red", "lightblue"))
+
+
 
 # Clean up ----------------------------------------------------------------
 
