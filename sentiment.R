@@ -2,31 +2,10 @@ library(tidyverse)
 library(rvest)
 library(RSelenium)
 library(tidytext)
-
-#start RSelenium
-rd <- rsDriver(browser = "firefox")
-remDr <- rd$client
-remDr$open(silent = TRUE)
+library(here)
+library(beepr)
 
 
-# Load comments -----------------------------------------------------------
-krone <- "http://www.krone.at/"
-
-# Load first article
-article <- "1676695"
-url <- paste0(krone, article)
-remDr$navigate(url)
-df1 <- extract_comments()
-df1 %>% View()
-
-# Load second article
-article <- "1675973"
-url <- paste0(krone, article)
-remDr$navigate(url)
-df2 <- extract_comments()
-df2 %>% View()
-
-df <- rbind(df1, df2)
 
 # Sentiment analysis ------------------------------------------------------
 

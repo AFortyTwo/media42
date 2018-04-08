@@ -1,62 +1,94 @@
 library(tidyverse)
 library(rvest)
-library(RSelenium)
+# library(RSelenium)
 
-#' Krone kommentare extrahieren
-#'
-#' Parsed aus einer Seite der Krone alle Kommentare. Seite muss vorher mit
-#' remDr$navigate(url) angesteuert werden. Danach steuert die Funktion durch
-#' alle Seiten der Kommentare durch und ruft `parse_comments()`, um die Kommentare
-#' einzulesen.
-#'
-#' @examples
-#' rd <- rsDriver(browser = "firefox")
-#' remDr <- rd$client
-#' remDr$open(silent = TRUE)
-#'
-#' url <- "http://www.krone.at/1676695"
-#' remDr$navigate(url)
-#' extract_comments()
-extract_comments <- function(article){
-  page <- remDr$getPageSource()[[1]] %>% read_html()
-  # remDr$screenshot(display = TRUE)
-  n_comments <- page %>% html_node(".c_count") %>% html_text(trim = TRUE) %>% parse_integer()
-  next_button <- remDr$findElement(using = "css selector", value = ".next")
-  df <- NULL
-  for (i in 1:floor(n_comments / 10)) {
-    page <- remDr$getPageSource()[[1]] %>% read_html()
-    comments <- page %>%
-      html_nodes(".c_comment")
-    df <- rbind(df, map_df(comments, parse_comments))  # Maybe it is better to keep the comments in lists
-    next_button$clickElement()
-    Sys.sleep(sample(seq(0,1,0.25), 1))
-    print(i)
-  }
-  df$article = remDr$getTitle()[[1]]
-  df$id_article = article
-  return(df)
-}
 
-#' Kommentare auslesen
+#' Resort Links extrahieren
 #'
-#' Liest eine Seite der Kommentare aus
-
-#' @param comments
+#' Extrahiert eine Liste von Artikeln für ein Resort der Krone.
 #'
-#' @return
+#' @param resort Website extension für Krone resort (z.B. "oesterreich", "welt", "sport")
+#'
+#' @return Linkliste
 #' @export
 #'
 #' @examples
-parse_comments <- function(comments){
-  list(
-    name = comments %>% html_node(".c_name") %>% html_text(),
-    date = comments %>% html_node(".c_datetime") %>% html_text(trim = TRUE) %>%
-      str_split(",") %>% map_chr(2) %>%
-      parse_datetime(format = "%d. %B %Y %H:%M", locale = locale("de")),
-    id_krone = comments %>% html_node(".c_id") %>% html_text(),
-    text = comments %>% html_nodes("p") %>% html_text() %>% paste(collapse = " "),
-    up = comments %>% html_node(".c_up") %>% html_node(".c_count") %>%  html_text(trim = TRUE) %>% parse_integer(),
-    down = comments %>% html_node(".c_down") %>% html_node(".c_count") %>%  html_text(trim = TRUE) %>% parse_integer()
+get_links <- function(resort) {
+  print(resort)
+  krone <- read_html(paste0("http://www.krone.at/", resort))
+  articles <- krone %>% html_nodes(".imgteaser")
+
+  return(
+    tibble(
+      url = articles %>% html_nodes("a") %>% html_attr("href"),
+      id_article = url %>% str_extract("[:digit:]+")
+    ) %>% distinct()
   )
+  Sys.sleep(sample(seq(0,1,0.25), 1))
+
+  # tibble(
+  #   # title = articles %>% html_nodes(".l_title") %>% html_text(trim = TRUE),
+  #   pretitle = articles %>% map(html_nodes, ".imgteaser__pretitle")  %>% map(html_text ,trim = TRUE),
+  #   title = articles %>% map(html_nodes, ".imgteaser__title")  %>% map(html_text ,trim = TRUE),
+  #   url = articles %>% html_nodes("a") %>% html_attr("href"),
+  #   id_article = url %>% str_extract("[:digit:]+")
+  # ) %>% unnest() %>% distinct()
+}
+
+#' Kommentare aus einem Artikel extrahieren
+#'
+#' Ruft die Kronenzeitung API auf und läd alle Kommentare eines Artikels inklusive Diggs
+#'
+#' @param id_article Artikel ID aus der URL
+#'
+#' @return Dataframe mit Kommentaren und Diggs
+#' @export
+#'
+#' @examples
+get_comments <- function(id_article) {
+  url <- paste0(
+    "http://api.krone.at/v1/comments/posts/", id_article,
+    "/page/1?limit=10&cors=true&domain=www.krone.at"
+  )
+  comments_json <- fromJSON(url, flatten = TRUE)
+  total <- comments_json$total
+  if (total > 0) {
+    print(paste("Article:", id_article, ", Comments", total))
+    df <- NULL
+    for (i in 1:comments_json$maxPages) {
+      url <- paste0(
+        "http://api.krone.at/v1/comments/posts/",
+        id_article,
+        "/page/",
+        i,
+        "?limit=10&cors=true&domain=www.krone.at"
+      )
+      comments_json <- fromJSON(url, flatten = TRUE)
+      comments <- comments_json$comments %>%
+        as.tibble() %>%
+        mutate(date = lubridate::ymd_hms(date.dateTime.date))
+      # Retrieve diggs
+      query = paste0(
+        "http://api.krone.at/v1/comments/diggs?query=[",
+        paste(comments$id, collapse = ","),
+        "]&cors=true&domain=www.krone.at"
+      )
+      digs <- fromJSON(query, flatten = TRUE)
+      if (length(digs$error) > 0) {
+        print(digs$message)
+        comments <- comments %>% mutate(positive = NA, negative = NA)
+      } else {
+        comments <- comments %>% left_join(
+          digs, by = c("id" = "commentId")
+        )
+      }
+      df <- rbind(df, comments)
+      Sys.sleep(sample(seq(0,1,0.25), 1))
+    }
+    df %>% mutate(content = gsub("<[^>]+>", "", .$content))
+  } else {
+    print(paste("Artikel", id_article, ": No comments"))
+    return("no comments")
+  }
 }
 
