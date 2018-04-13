@@ -1,0 +1,73 @@
+---
+title: "Krone Kommentare"
+author: "Robert Kalcik"
+date: "10 April 2018"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DT)
+library(plotly)
+
+# Resortliste aus krone.at/ URL
+resort = c("bundeslaender", "wirtschaft",  "politik", "welt", "sport", "oesterreich",
+                        "nachrichten", "wissen", "viral", "fussball", "motorsport", "wintersport",
+                        "tennis", "stars-society", "lifestyle", "kino", "musik", "medien", "digital",
+                        "freizeit", "auto", "web", "elektronik", "spiele", "digitale-trends",
+                        "gesund-fit", "life", "tierecke", "reisen-urlaub", "bauen-wohnen", "lieblingsrezept"
+                        )
+resort <- resort %>% sort() %>% str_replace("-", "_")
+```
+
+
+## Artikel laden
+```{r load, message=FALSE, warning=FALSE}
+
+files <- list.files(path='export/', pattern="*.csv", full.names=T, recursive=FALSE)
+df <- map_df(files, readr::read_csv) %>% distinct()
+df <- df %>% 
+  group_by(id) %>% 
+  mutate(diggs = positive + negative) %>% 
+  arrange(desc(diggs)) %>% 
+  filter(row_number() == 1)   # This is not perfectly correct. If a comment appears in two different resorts and the digg count changed, it will not show up as belonging to all of them
+
+# df %>% 
+#   sample_n(20) %>% 
+#   select(user.username, content, positive, negative, url) %>% 
+#   datatable()
+```
+
+## Distributions
+
+```{r}
+users <- df %>% group_by(user.username) %>% 
+  summarise(
+    n_comments = n(), 
+    n_positive = sum(positive, na.rm = TRUE), 
+    n_negative = sum(negative, na.rm = TRUE), 
+    prop = n_positive / n_negative) %>% 
+    arrange(desc(n_comments)) 
+    # %>%  datatable()
+
+p <- users %>% 
+  ggplot(aes(x = log(n_positive), y = log(n_negative), text = user.username)) +
+    geom_point() 
+  
+ggplotly(p)
+users %>%  datatable()
+
+```
+
+## Top Comments per User
+```{r}
+selectizeInput("u", "Select user", unique(df$user.username), selected = "karrrramba")
+renderText(input$u)
+renderTable(df %>% sample_n(3) %>% select(user.username, content))
+
+
+```
+
+

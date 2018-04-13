@@ -1,6 +1,7 @@
 library(jsonlite)
 library(tidyverse)
 library(rvest)
+devtools::load_all()
 
 # Resortliste aus krone.at/ URL
 df <- tibble(resort = c("bundeslaender", "wirtschaft",  "politik", "welt", "sport", "oesterreich",
@@ -16,15 +17,18 @@ df <- df %>%
   mutate(n = TRUE, resort = str_replace(resort, "-", "_")) %>%
   spread(resort, n, fill = FALSE)
 
-# Alle Kommentare inklusive Diggs runterladen (Dauer ca. XX) und bereinigen
+# Alle Kommentare inklusive Diggs runterladen (Dauer ca. 30 min) und bereinigen
 tictoc::tic()
 df_comments <- df %>% mutate(comments = map(id_article, get_comments))
 tictoc::toc()
-df_comments <- df_comments %>% filter(comments != "no comments") %>% unnest()
+df_comments <- df_comments %>%
+  filter(comments != "no comments") %>%
+  unnest() %>%
+  mutate(retrieved = Sys.Date())
 
 # Speichern unter heutigem Datum
-save(df_comments, file = paste0("export/scrape_", Sys.Date(), ".RData"))
-df_comments %>% write_csv(paste0("export/krone_scrape_", Sys.Date(),".csv"))
+save(df_comments, file = paste0("export/krone_scrape_", Sys.Date(), ".RData"))
+df_comments %>% write_delim(paste0("export/krone_scrape_", Sys.Date(), ".csv"), delim = ",")
 
 
 

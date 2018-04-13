@@ -1,13 +1,16 @@
 library(tidyverse)
-library(rvest)
-library(RSelenium)
 library(tidytext)
-library(here)
-library(beepr)
-
-
 
 # Sentiment analysis ------------------------------------------------------
+files <- list.files(path='export/', pattern="*.csv", full.names=T, recursive=FALSE)
+df <- map_df(files, readr::read_csv) %>% distinct()
+df <- df %>%
+  group_by(id) %>%
+  mutate(diggs = positive + negative) %>%
+  arrange(desc(diggs)) %>%
+  filter(row_number() == 1) %>%
+  ungroup()
+
 
 # Lexika und Stopwords vorbereiten
 lexicon <-
@@ -27,12 +30,12 @@ lexicon <- lexicon %>%
   )
 
 stopwords <- tokenizers::stopwords("de") %>% append(
-  c("dass", "ja", "mehr", "mal")
+  c("dass", "ja", "mehr", "mal", "schon", "immer", "gibt", "wäre", "wer", "gut", "geht", "warum", "viele")
 )
 
 # Wörter extrahieren
 words <- df %>%
-  unnest_tokens(word, text, token = "words") %>%  #  "regex", pattern = reg) %>%
+  unnest_tokens(word, content, token = "words") %>%  #  "regex", pattern = reg) %>%
   filter(!word %in% stopwords,
          str_detect(word, "[a-z]"))
 

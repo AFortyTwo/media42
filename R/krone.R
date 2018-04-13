@@ -85,10 +85,18 @@ get_comments <- function(id_article) {
       df <- rbind(df, comments)
       Sys.sleep(sample(seq(0,1,0.25), 1))
     }
-    df %>% mutate(content = gsub("<[^>]+>", "", .$content))
+    df %>% mutate(
+      content = gsub("<[^>]+>", "", .$content),
+      content = map_chr(content, unescape_html)
+    )
   } else {
     print(paste("Artikel", id_article, ": No comments"))
     return("no comments")
   }
+}
+
+
+unescape_html <- function(str){
+  xml2::xml_text(xml2::read_html(paste0("<x>", str, "</x>")))
 }
 
