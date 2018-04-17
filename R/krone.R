@@ -95,8 +95,40 @@ get_comments <- function(id_article) {
   }
 }
 
+#' Artikelinhalt extrahieren
+#'
+#' Ruft einen Artikel auf und speichert Inhalt und Metadaten
+#'
+#' @param id_article Artikel ID aus der URL
+#'
+#' @return Dataframe
+#' @export
+#'
+#' @examples
+get_article <- function(id_article) {
+  url <- paste0("http://www.krone.at/", id_article)
+  site <- s_read_html(url)
+  if (!is.null(site$result)) {
+    a <- site$result
+    df <- tibble(
+      page = as.character(a),
+      title = a %>% html_nodes("h1") %>% html_text(),
+      date = a %>% html_nodes(".c_pretitle .c_time") %>% html_text()
+    )
+    print(paste("Article:", id_article, ", Title: ", df$title))
+    return(df)
+    Sys.sleep(sample(seq(0,1,0.25), 1))
+  } else {
+    closeAllConnections()
+    print(paste("Artikel", id_article, ": Not found"))
+    return("down")
+  }
+}
+
 
 unescape_html <- function(str){
   xml2::xml_text(xml2::read_html(paste0("<x>", str, "</x>")))
 }
+
+s_read_html <- safely(read_html)
 
