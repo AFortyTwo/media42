@@ -49,6 +49,11 @@ words %>%
   ylab("Occurrences") +
   coord_flip()
 
+words %>%
+  count(word, sort = TRUE) %>%
+  head(5000) %>%
+  write_csv('export/woerter.csv')
+
 # Relative häufigkeit
 ratios <- words %>%
   count(word, id_article) %>%

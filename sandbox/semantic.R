@@ -1,5 +1,5 @@
 library(quanteda)
-x <- corpus(df, text_field = "content")
+x <- corpus(df, text_field = "content_comment")
 summary(x)
 kwic(x, "kern")
 

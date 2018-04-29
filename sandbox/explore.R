@@ -1,50 +1,37 @@
 library(tidyverse)
 library(plotly)
+library(lubridate)
 
 # Resortliste aus krone.at/ URL
 resort_list <- read_csv('data/krone_resorts.csv')
-
-files <- list.files(path='export/', pattern="*.csv", full.names=T, recursive=FALSE)
-df <- map_df(files, readr::read_csv) %>% distinct() %>%
-  select(id_article, id, user.id, user.username, date, positive, negative, content, everything())
-# Drop unchanged duplicates
-df <- df %>% select(-retrieved) %>% distinct()
-
-# Only keep the most recent observation of a comment (what about changing resorts?)
-df <- df %>%
-  group_by(id) %>%
-  mutate(diggs = positive + negative) %>%
-  arrange(desc(diggs)) %>%
-  filter(row_number() == 1) %>%
-  ungroup()
-
+df <- readRDS("export/other/merged.rds") %>% tibble()
 
 # Resort analyse ----------------------------------------------------------
 
 flip <- df %>% gather(resort, value, auto:wissen) %>% filter(value == T) %>% select(-value)
 flip <- flip %>% left_join(resort_list, by = "resort")
 
-comment_count <- flip %>%  count(resort) %>% mutate(prop = n/sum(n))
-comment_count %>% ggplot(aes(x = reorder(resort, n), y = prop)) +
+comment_count <- flip %>%  count(cat) %>% mutate(prop = n/sum(n))
+comment_count %>% ggplot(aes(x = reorder(cat, n), y = prop)) +
     geom_bar(stat = "identity") +
     coord_flip() +
-    ylab("Proportion of Comments in Resort") +
-    xlab("Resort")
+    ylab("Proportion of Comments in Ressort") +
+    xlab("Ressort")
 
-article_count <- flip %>% select(id_article, resort) %>% distinct() %>%
-  count(resort) %>% mutate(prop = n/sum(n))
-article_count %>% ggplot(aes(x = reorder(resort, n), y = prop)) +
+article_count <- flip %>% select(id_article, cat) %>% distinct() %>%
+  count(cat) %>% mutate(prop = n/sum(n))
+article_count %>% ggplot(aes(x = reorder(cat, n), y = prop)) +
   geom_bar(stat = "identity") +
   coord_flip() +
   ylab("Proportion of Articles in Resort") +
   xlab("Resort")
 
-article_count %>% left_join(comment_count, by = "resort", suffix = c("_article", "_comment")) %>%
-  ggplot(aes(x = reorder(resort, n_article), group = 1)) +
+article_count %>% left_join(comment_count, by = "cat", suffix = c("_article", "_comment")) %>%
+  ggplot(aes(x = reorder(cat, n_article), group = 1)) +
     geom_bar(aes(y = prop_article), stat = "identity") +
-    geom_line(aes(y = prop_comment)) +
+    geom_point(aes(y = prop_comment)) +
     coord_flip() +
-    labs(y = "Proportion of Articles/Comments", x = "Resort", title = "Artikel vs Kommentare", subtitle = "Double counting if article appears in multiple resorts")
+    labs(y = "Proportion of Articles/Comments", x = "Resort", title = "Artikel vs Kommentare") # , subtitle = "Double counting if article appears in multiple resorts"
 
 # Combos
 flip %>% select(id_article, resort = cat) %>% distinct() %>%
@@ -81,4 +68,37 @@ p <- users %>%
 
 ggplotly(p)
 
-df %>% select(date)
+
+# diggs -------------------------------------------------------------------
+
+p <- df %>% arrange(desc(diggs)) %>% filter(row_number() < 1000) %>%
+  ggplot(aes(x = positive, y = negative,
+             text = paste0(user.username, ": ", content),
+             colour = politik)) +
+    geom_point()
+
+ggplotly(p, tooltip = "text")
+
+# Time series -------------------------------------------------------------
+
+df %>% group_by(period = floor_date(date, "5 day")) %>%
+  summarise(n = n())  %>%
+  ggplot(aes(x = period, y = n)) +
+    geom_line()
+
+
+# Individual article ------------------------------------------------------
+
+lol %>% ggplot(aes(x = user.username)) +
+  geom_bar() +
+  coord_flip()
+
+lol %>% group_by(user.id) %>% mutate(n = n()) %>%
+  arrange(desc(n)) %>% select(user.username, diggs, content, positive, negative, date)
+
+lol %>% saveRDS("falter_golan.rds")
+
+
+# user over time ----------------------------------------------------------
+
+

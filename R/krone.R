@@ -105,22 +105,41 @@ get_comments <- function(id_article) {
 #' @export
 #'
 #' @examples
-get_article <- function(id_article) {
+get_article <- function(id_article, pb = NULL) {
+  # progress bar magic!
+  if (!is.null(pb)) pb$tick()$print()
+
+  # Scrape
   url <- paste0("http://www.krone.at/", id_article)
   site <- s_read_html(url)
   if (!is.null(site$result)) {
     a <- site$result
-    df <- tibble(
-      page = as.character(a),
+    df <- list(
+      date = a %>% html_nodes(".c_pretitle .c_time") %>%
+        html_text() %>% lubridate::dmy_hm(tz = "CET"),
+      author1 = a %>% html_node("em span") %>% html_text(trim = TRUE),
+      author2 = a %>% html_node(".authorline__name") %>% html_text(trim = TRUE),
       title = a %>% html_nodes("h1") %>% html_text(),
-      date = a %>% html_nodes(".c_pretitle .c_time") %>% html_text()
+      subtitle = a %>% html_nodes(".c_pretitle h2") %>% html_text(),
+      lead = a %>% html_nodes(".c_lead") %>% html_text(),
+      meta_description = a %>% html_node(xpath = '//meta[@name="description"]') %>% html_attr('content'),
+      meta_ressort_id = a %>% html_node(xpath = '//meta[@name="krn-ressort-id"]') %>% html_attr('content'),
+      meta_ressort_slug = a %>% html_node(xpath = '//meta[@name="krn-ressort-slug"]') %>% html_attr('content'),
+      meta_template_id = a %>% html_node(xpath = '//meta[@name="krn-template-id"]') %>% html_attr('content'),
+      meta_modified = a %>% html_node(xpath = '//meta[@name="krn-article-modified"]') %>% html_attr('content'),
+      image_link = a %>% html_node(xpath = '//meta[@property="og:image"]') %>% html_attr('content'),
+      text = a %>% html_nodes(".c_content") %>% html_text(trim = TRUE),
+      para = a %>% html_nodes(".c_content") %>% html_nodes("p") %>% html_text()
+      # page = as.character(a)
     )
-    print(paste("Article:", id_article, ", Title: ", df$title))
+    df[lengths(df) == 0] <- NA
+    df <- df %>% as_tibble() %>% group_by_at(vars(-para)) %>% nest()
+    # print(paste("Article:", id_article, ", Title: ", df$title))
     return(df)
     Sys.sleep(sample(seq(0,1,0.25), 1))
   } else {
     closeAllConnections()
-    print(paste("Artikel", id_article, ": Not found"))
+    # print(paste("Artikel", id_article, ": Not found"))
     return("down")
   }
 }
