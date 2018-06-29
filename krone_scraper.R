@@ -22,7 +22,8 @@ links <- links %>%
 
 # Alle Kommentare inklusive Diggs runterladen (Dauer ca. 30 min) und bereinigen
 tictoc::tic()
-df <- links %>% mutate(comments = map(id_article, get_comments))
+pb <- dplyr::progress_estimated(length(links$id_article))
+df <- links %>% mutate(comments = map(id_article, get_comments, pb = pb))
 tictoc::toc()
 df <- df %>%
   filter(comments != "no comments") %>%
@@ -96,7 +97,7 @@ df_articles <- df_articles %>%
 resort_list <- read_csv('data/krone_resorts.csv')
 
 f_comments <- list.files(path='export/', pattern="*.csv", full.names=T, recursive=FALSE)
-df <- map_df(f_comments, readr::read_csv) %>% distinct()
+df <- map_df(f_comments, readr::read_csv) %>% distinct() # possible to re-write this as RDS; but error with datetime variable
 
 # Drop unchanged duplicates
 df <- df %>% select(-retrieved) %>% distinct() %>% mutate(id_article = as.character(id_article))
@@ -124,7 +125,27 @@ df <- df %>%
   ) %>%
   select(
     -status:-url_article
+  ) %>%
+  mutate(
+    id_comment = as.character(id_comment),
+    id_user = as.character(id_user)
   )
 
 saveRDS(df, file = "export/other/merged.rds")
 df %>% select(-para) %>% write_csv("export/other/merged.csv")
+
+
+# Export for Dashboard ----------------------------------------------------
+df %>%
+  filter(date_article > max(date_article, na.rm = T) - lubridate::weeks(8)) %>%
+  filter(date_comment > max(date_comment, na.rm = T) - lubridate::weeks(8)) %>%
+  select(-meta_description:-meta_modified, -para, -text) %>%
+  saveRDS(file = "../krone-dashboard/data/comments.RDS")
+
+df %>%
+  filter(date_article > max(date_article, na.rm = T) - lubridate::weeks(8)) %>%
+  select(id_article, para, text) %>%
+  group_by(id_article) %>% filter(row_number() == 1) %>%
+  saveRDS(file = "../krone-dashboard/data/articles.RDS")
+
+

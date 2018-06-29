@@ -45,7 +45,10 @@ get_links <- function(resort) {
 #' @export
 #'
 #' @examples
-get_comments <- function(id_article) {
+get_comments <- function(id_article, pb = NULL) {
+  # progress bar magic!
+  if (!is.null(pb)) pb$tick()$print()
+
   url <- paste0(
     "http://api.krone.at/v1/comments/posts/", id_article,
     "/page/1?limit=10&cors=true&domain=www.krone.at"
@@ -53,7 +56,7 @@ get_comments <- function(id_article) {
   comments_json <- fromJSON(url, flatten = TRUE)
   total <- comments_json$total
   if (total > 0) {
-    print(paste("Article:", id_article, ", Comments", total))
+    # print(paste("Article:", id_article, ", Comments", total))
     df <- NULL
     for (i in 1:comments_json$maxPages) {
       url <- paste0(
@@ -90,7 +93,7 @@ get_comments <- function(id_article) {
       content = map_chr(content, unescape_html)
     )
   } else {
-    print(paste("Artikel", id_article, ": No comments"))
+    # print(paste("Artikel", id_article, ": No comments"))
     return("no comments")
   }
 }
